@@ -1,7 +1,28 @@
 FROM centos:5
 
+RUN sed -i 's/enabled=1/enabled=0/' /etc/yum.repos.d/libselinux.repo && sed -i 's/enabled=1/enabled=0/' /etc/yum.repos.d/CentOS-Base.repo
+RUN rm -f /etc/yum.repos.d/libselinux.repo /etc/yum.repos.d/CentOS-Base.repo
+ADD CentOS-5.11-EOL.repo /etc/yum.repos.d/CentOS-5.11-EOL.repo
 RUN yum -y clean all
-#RUN yum -y update && yum -y install postgresql-server
+RUN yum -y update
+
+RUN groupadd -r postgres && useradd -r -g postgres postgres
+RUN yum -y install postgresql-server sudo
+
+ADD postgresql.conf /var/lib/pgsql/template/postgresql.conf
+ADD pg_hba.conf /var/lib/pgsql/template/pg_hba.conf
+RUN chown postgres:postgres /var/lib/pgsql/template/*.conf
+
+ADD init-postgresql /usr/local/bin/init-postgresql
+RUN chmod +x /usr/local/bin/init-postgresql
+
+RUN chown postgres:postgres /var/lib/pgsql/*
+
+VOLUME ["/var/lib/pgsql/data"]
+EXPOSE 5432
+
+CMD ["/usr/local/bin/init-postgresql"]
+
 
 # ADD pgdg.list /etc/apt/sources.list.d/pgdg.list
 # RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -

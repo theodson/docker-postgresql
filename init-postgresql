@@ -1,27 +1,53 @@
 #!/bin/bash
 set -e
 
-POSTGRESQL_USER=${POSTGRESQL_USER:-"docker"}
-POSTGRESQL_PASS=${POSTGRESQL_PASS:-"docker"}
+POSTGRESQL_USER=${POSTGRESQL_USER:-"postgres"}
+POSTGRESQL_PASS=${POSTGRESQL_PASS:-"postgres"}
 POSTGRESQL_DB=${POSTGRESQL_DB:-"docker"}
+POSTGRESQL_ENC=${POSTGRESQL_ENC:-"SQL_ASCII"}
+POSTGRESQL_ENC=${POSTGRESQL_ENC:-"UTF-8"}
 POSTGRESQL_TEMPLATE=${POSTGRESQL_TEMPLATE:-"DEFAULT"}
 
-POSTGRESQL_BIN=/usr/lib/postgresql/8.4/bin/postgres
-POSTGRESQL_CONFIG_FILE=/etc/postgresql/8.4/main/postgresql.conf
-POSTGRESQL_DATA=/var/lib/postgresql/8.4/main
-
-POSTGRESQL_SINGLE="sudo -u postgres $POSTGRESQL_BIN --single --config-file=$POSTGRESQL_CONFIG_FILE"
-
-if [ ! -d $POSTGRESQL_DATA ]; then
-    mkdir -p $POSTGRESQL_DATA
-    chown -R postgres:postgres $POSTGRESQL_DATA
-    sudo -u postgres /usr/lib/postgresql/8.4/bin/initdb -D $POSTGRESQL_DATA -E 'UTF-8'
-    ln -s /etc/ssl/certs/ssl-cert-snakeoil.pem $POSTGRESQL_DATA/server.crt
-    ln -s /etc/ssl/private/ssl-cert-snakeoil.key $POSTGRESQL_DATA/server.key
+if [ -e /etc/redhat-release ]; then
+    POSTGRESQL_BIN=/usr/bin/postgres
+    POSTGRESQL_INITDB=/usr/bin/initdb
+    POSTGRESQL_DATA=/var/lib/pgsql/data
+    POSTGRESQL_CONFIG_FILE=${POSTGRESQL_DATA}/postgresql.conf
+    TEMPLATE_PG_CONFIG_FILE=/var/lib/pgsql/template/postgresql.conf
+    TEMPLATE_PG_HBA_FILE=/var/lib/pgsql/template/pg_hba.conf
+else
+    POSTGRESQL_BIN=/usr/lib/postgresql/8.4/bin/postgres
+    POSTGRESQL_INITDB=/usr/lib/postgresql/8.4/bin/initdb
+    POSTGRESQL_CONFIG_FILE=/etc/postgresql/8.4/main/postgresql.conf
+    POSTGRESQL_DATA=/var/lib/postgresql/8.4/main
 fi
+
+if [ ! -n "$(ls -A $POSTGRESQL_DATA)" ]; then
+    echo "Directory is empty or non existent."
+
+    mkdir -p $POSTGRESQL_DATA
+    chown postgres:postgres $POSTGRESQL_DATA
+    chmod 700 $POSTGRESQL_DATA
+#    sudo -u postgres $POSTGRESQL_INITDB -D $POSTGRESQL_DATA -E ${POSTGRESQL_ENC}
+    sudo -u postgres $POSTGRESQL_INITDB -D $POSTGRESQL_DATA -E 'UTF-8'
+    sudo cp -f $TEMPLATE_PG_CONFIG_FILE $POSTGRESQL_DATA/
+    sudo cp -f $TEMPLATE_PG_HBA_FILE $POSTGRESQL_DATA/
+    chown postgres:postgres $POSTGRESQL_DATA/*
+    chmod 700 $POSTGRESQL_DATA/*
+    # certs not for centos
+    [ -e /etc/redhat-release ] || ln -s /etc/ssl/certs/ssl-cert-snakeoil.pem $POSTGRESQL_DATA/server.crt
+    [ -e /etc/redhat-release ] || ln -s /etc/ssl/private/ssl-cert-snakeoil.key $POSTGRESQL_DATA/server.key
+else
+    echo "Files found ... assuming existing database."
+fi
+
+# --single not support in 8.1
+POSTGRESQL_SINGLE="sudo -u postgres $POSTGRESQL_BIN --config-file=$TEMPLATE_PG_CONFIG_FILE"
 
 $POSTGRESQL_SINGLE <<< "CREATE USER $POSTGRESQL_USER WITH SUPERUSER;" > /dev/null
 $POSTGRESQL_SINGLE <<< "ALTER USER $POSTGRESQL_USER WITH PASSWORD '$POSTGRESQL_PASS';" > /dev/null
 $POSTGRESQL_SINGLE <<< "CREATE DATABASE $POSTGRESQL_DB OWNER $POSTGRESQL_USER TEMPLATE $POSTGRESQL_TEMPLATE;" > /dev/null
 
-exec sudo -u postgres $POSTGRESQL_BIN --config-file=$POSTGRESQL_CONFIG_FILE
+#echo exec sudo -u postgres $POSTGRESQL_BIN --config-file=$POSTGRESQL_CONFIG_FILE -D $POSTGRESQL_DATA -p 5432
+#exec sudo -u postgres $POSTGRESQL_BIN --config-file=$POSTGRESQL_CONFIG_FILE -D $POSTGRESQL_DATA -p 5432
+exec sudo -u postgres /usr/bin/postmaster -D /var/lib/pgsql/data
