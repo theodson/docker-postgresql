@@ -23,7 +23,7 @@ else
 fi
 
 if [ ! -n "$(ls -A $POSTGRESQL_DATA)" ]; then
-    echo "Directory is empty or non existent."
+    echo "Directory is empty or non existent (creating '${POSTGRESQL_DATA}' now."
 
     mkdir -p $POSTGRESQL_DATA
     chown postgres:postgres $POSTGRESQL_DATA
@@ -38,7 +38,7 @@ if [ ! -n "$(ls -A $POSTGRESQL_DATA)" ]; then
     [ -e /etc/redhat-release ] || ln -s /etc/ssl/certs/ssl-cert-snakeoil.pem $POSTGRESQL_DATA/server.crt
     [ -e /etc/redhat-release ] || ln -s /etc/ssl/private/ssl-cert-snakeoil.key $POSTGRESQL_DATA/server.key
 else
-    echo "Files found ... assuming existing database."
+    echo "Files found at ${POSTGRESQL_DATA} ... assuming existing database."
 fi
 
 # --single not support in 8.1
