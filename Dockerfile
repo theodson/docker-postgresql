@@ -18,6 +18,8 @@ RUN chmod +x /usr/local/bin/init-postgresql
 
 RUN chown postgres:postgres /var/lib/pgsql/*
 
+RUN sed -i -e "s/Defaults    requiretty.*/ #Defaults    requiretty/g" /etc/sudoers
+
 VOLUME ["/var/lib/pgsql/data"]
 EXPOSE 5432
 
